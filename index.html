@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Fund | ม.4/1 โยธินบูรณะ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #f3f4f6; }
+        .card-shadow { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<div id="app" class="max-w-md mx-auto p-4">
+    <!-- Header -->
+    <header class="py-6 text-center">
+        <h1 class="text-3xl font-bold text-blue-700">💰 เงินห้อง ม.4/1</h1>
+        <div id="user-info" class="text-gray-500 text-sm mt-2 hidden"></div>
+    </header>
+
+    <!-- หน้า Login/Signup -->
+    <div id="auth-ui" class="bg-white rounded-3xl p-8 card-shadow">
+        <h2 id="auth-title" class="text-xl font-bold mb-6 text-center">เข้าสู่ระบบ</h2>
+        <div class="space-y-4">
+            <div id="register-only" class="hidden space-y-4">
+                <input type="text" id="reg-name" placeholder="ชื่อ-นามสกุล" class="w-full p-4 bg-gray-100 rounded-2xl outline-none">
+                <input type="number" id="reg-no" placeholder="เลขที่" class="w-full p-4 bg-gray-100 rounded-2xl outline-none">
+            </div>
+            <input type="email" id="email" placeholder="อีเมลนักเรียน" class="w-full p-4 bg-gray-100 rounded-2xl outline-none">
+            <input type="password" id="password" placeholder="รหัสผ่าน" class="w-full p-4 bg-gray-100 rounded-2xl outline-none">
+            <button onclick="authAction()" id="auth-btn" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition">เข้าสู่ระบบ</button>
+            <button onclick="toggleAuth()" id="toggle-btn" class="w-full text-sm text-blue-500 mt-2">ยังไม่มีบัญชี? สมัครสมาชิก</button>
+        </div>
+    </div>
+
+    <!-- หน้า Dashboard -->
+    <div id="main-ui" class="hidden space-y-4">
+        <!-- ยอดรวม -->
+        <div class="bg-blue-600 p-8 rounded-3xl text-white card-shadow relative overflow-hidden">
+            <p class="opacity-80">เงินคงเหลือทั้งหมด</p>
+            <h2 id="total-balance" class="text-4xl font-bold mt-1">0.00 บาท</h2>
+            <div class="mt-4 pt-4 border-t border-white/20 flex justify-between text-xs">
+                <span>จ่ายแล้ว: <b id="my-paid">0</b> บ.</span>
+                <span>สถานะ: <b class="text-green-300">ปกติ</b></span>
+            </div>
+        </div>
+
+        <!-- ฟอร์มส่งสลิป -->
+        <div class="bg-white p-6 rounded-3xl card-shadow">
+            <h3 class="font-bold mb-4">📤 ส่งหลักฐานการโอน</h3>
+            <div class="space-y-3">
+                <input type="number" id="amount" placeholder="จำนวนเงิน" class="w-full p-4 bg-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="file" id="slip-file" accept="image/*" class="w-full text-sm text-gray-500">
+                <button onclick="uploadSlip()" class="w-full py-4 bg-green-500 text-white rounded-2xl font-bold hover:bg-green-600 transition">ยืนยันการส่ง</button>
+            </div>
+        </div>
+
+        <!-- ประวัติ -->
+        <div class="bg-white p-6 rounded-3xl card-shadow">
+            <h3 class="font-bold mb-4">ประวัติของฉัน</h3>
+            <div id="history" class="space-y-3 text-sm"></div>
+        </div>
+
+        <button onclick="logout()" class="w-full py-4 text-gray-400">ออกจากระบบ</button>
+    </div>
+</div>
+
+<script>
+    // --- ตั้งค่า SUPABASE ---
+    const URL = 'https://zhvhnshjfcabdxisszkd.supabase.co/rest/v1/';
+    const KEY = 'sb_publishable_T4ZXpGnSFN3zgee_SJXICQ_4T_IU8pH';
+    const sb = supabase.createClient(URL, KEY);
+
+    let isLogin = true;
+
+    async function checkUser() {
+        const { data: { user } } = await sb.auth.getUser();
+        if (user) {
+            document.getElementById('auth-ui').classList.add('hidden');
+            document.getElementById('main-ui').classList.remove('hidden');
+            loadData(user);
+        }
+    }
+
+    function toggleAuth() {
+        isLogin = !isLogin;
+        document.getElementById('auth-title').innerText = isLogin ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก';
+        document.getElementById('register-only').classList.toggle('hidden', isLogin);
+        document.getElementById('auth-btn').innerText = isLogin ? 'เข้าสู่ระบบ' : 'สร้างบัญชี';
+        document.getElementById('toggle-btn').innerText = isLogin ? 'ยังไม่มีบัญชี? สมัครสมาชิก' : 'มีบัญชีแล้ว? เข้าสู่ระบบ';
+    }
+
+    async function authAction() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        if (isLogin) {
+            const { error } = await sb.auth.signInWithPassword({ email, password });
+            if (error) alert(error.message); else location.reload();
+        } else {
+            const name = document.getElementById('reg-name').value;
+            const no = document.getElementById('reg-no').value;
+            const { data, error } = await sb.auth.signUp({ email, password });
+            if (error) return alert(error.message);
+            if (data.user) {
+                await sb.from('profiles').insert([{ id: data.user.id, full_name: name, student_no: no }]);
+                alert('สมัครสำเร็จ! เข้าสู่ระบบได้เลย');
+                location.reload();
+            }
+        }
+    }
+
+    async function loadData(user) {
+        // ดึงยอดรวม
+        const { data: tx } = await sb.from('transactions').select('amount').eq('status', 'approved');
+        const total = tx.reduce((s, t) => s + Number(t.amount), 0);
+        document.getElementById('total-balance').innerText = total.toLocaleString() + ' บาท';
+
+        // ดึงโปรไฟล์
+        const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).single();
+        document.getElementById('user-info').innerText = `สวัสดี: ${prof.full_name} (เลขที่ ${prof.student_no})`;
+        document.getElementById('user-info').classList.remove('hidden');
+
+        // ดึงประวัติ
+        const { data: hist } = await sb.from('transactions').select('*').eq('user_id', user.id).order('created_at', {ascending: false});
+        const list = document.getElementById('history');
+        list.innerHTML = hist.length ? '' : 'ไม่มีรายการ';
+        hist.forEach(h => {
+            list.innerHTML += `
+                <div class="flex justify-between p-3 bg-gray-50 rounded-xl">
+                    <span>${h.amount} บ. <small class="text-gray-400">(${h.status})</small></span>
+                    <span class="text-[10px] text-gray-400">${new Date(h.created_at).toLocaleDateString()}</span>
+                </div>`;
+        });
+    }
+
+    async function uploadSlip() {
+        const amt = document.getElementById('amount').value;
+        const file = document.getElementById('slip-file').files[0];
+        const { data: { user } } = await sb.auth.getUser();
+
+        if (!amt || !file) return alert('ข้อมูลไม่ครบ');
+
+        const fileName = `${Date.now()}_${user.id}`;
+        const { error: upErr } = await sb.storage.from('slips').upload(fileName, file);
+        if (upErr) return alert('รูปพัง');
+
+        await sb.from('transactions').insert([{ user_id: user.id, amount: amt, slip_url: fileName }]);
+        alert('ส่งแล้ว!');
+        location.reload();
+    }
+
+    async function logout() { await sb.auth.signOut(); location.reload(); }
+    window.onload = checkUser;
+</script>
+</body>
+</html>
