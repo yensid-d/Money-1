@@ -19,6 +19,7 @@
             <p class="text-gray-500 text-sm">Room Fund Management</p>
         </header>
 
+        <!-- ส่วนล็อกอิน/สมัครสมาชิก -->
         <div id="auth-view" class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
             <div class="flex mb-6 bg-gray-100 p-1 rounded-xl">
                 <button onclick="toggleAuthMode('login')" id="btn-login-mode" class="flex-1 py-2 rounded-lg font-semibold bg-white shadow-sm transition-all">เข้าสู่ระบบ</button>
@@ -26,18 +27,19 @@
             </div>
             
             <div class="space-y-4">
-                <div id="signup-extra-fields" class="hidden space-y-4">
-                    <input type="text" id="full-name" placeholder="ชื่อ-นามสกุล" class="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-400">
-                    <input type="number" id="student-no" placeholder="เลขที่" class="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-400">
+                <div id="signup-extra-fields" class="hidden">
+                    <input type="text" id="full-name" placeholder="ชื่อ-นามสกุล" class="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-400 mb-4">
                 </div>
-                <input type="email" id="email" placeholder="อีเมล" class="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-400">
+                <!-- ใช้เลขที่แทน Email -->
+                <input type="number" id="student-no" placeholder="เลขที่ (เช่น 1)" class="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-400">
                 <input type="password" id="password" placeholder="รหัสผ่าน" class="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-400">
                 <button onclick="handleAuth()" id="auth-submit-btn" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 active:scale-95 transition-all">เข้าสู่ระบบ</button>
             </div>
         </div>
 
+        <!-- ส่วนหน้าจอหลัก -->
         <div id="main-view" class="hidden space-y-6">
-            <div class="bg-blue-600 rounded-3xl p-8 text-white shadow-lg shadow-blue-100">
+            <div class="bg-blue-600 rounded-3xl p-8 text-white shadow-lg">
                 <p class="opacity-80 text-sm mb-1">ยอดเงินคงเหลือห้อง</p>
                 <h2 id="room-total" class="text-4xl font-bold">0.00 บาท</h2>
                 <div class="mt-4 pt-4 border-t border-white/20 text-sm">
@@ -50,21 +52,50 @@
                 <div class="space-y-3">
                     <input type="number" id="amount" placeholder="ระบุจำนวนเงิน" class="w-full p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-400">
                     <input type="file" id="slip-file" class="w-full text-xs text-gray-500 py-2" accept="image/*">
-                    <button onclick="submitSlip()" class="w-full py-4 bg-gray-800 text-white rounded-2xl font-bold hover:bg-black active:scale-95 transition-all">ส่งสลิปยืนยัน</button>
+                    <button onclick="submitSlip()" class="w-full py-4 bg-gray-800 text-white rounded-2xl font-bold hover:bg-black transition-all">ส่งสลิปยืนยัน</button>
                 </div>
             </div>
 
-            <button onclick="signOut()" class="w-full py-3 text-gray-400 text-sm hover:text-red-400 transition-colors">ออกจากระบบ</button>
+            <button onclick="signOut()" class="w-full py-3 text-gray-400 text-sm">ออกจากระบบ</button>
         </div>
     </div>
 
     <script>
+        // ใส่ URL และ Key ของดิสนีย์ตรงนี้
         const SB_URL = 'https://zhvhnshjfcabdxisszkd.supabase.co'; 
         const SB_KEY = 'sb_publishable_T4ZXpGnSFN3zgee_SJXICQ_4T_IU8pH';
         const sb = supabase.createClient(SB_URL, SB_KEY);
 
-        // ประกาศตัวแปรนี้ไว้ด้านบนสุดเพื่อป้องกัน Error เหมือนในรูปที่น้องส่งมา
         let isLoginMode = true;
+
+        function toggleAuthMode(mode) {
+            isLoginMode = mode === 'login';
+            document.getElementById('signup-extra-fields').classList.toggle('hidden', isLoginMode);
+            document.getElementById('btn-login-mode').className = isLoginMode ? 'flex-1 py-2 rounded-lg font-semibold bg-white shadow-sm' : 'flex-1 py-2 rounded-lg font-semibold text-gray-500';
+            document.getElementById('btn-signup-mode').className = !isLoginMode ? 'flex-1 py-2 rounded-lg font-semibold bg-white shadow-sm' : 'flex-1 py-2 rounded-lg font-semibold text-gray-500';
+            document.getElementById('auth-submit-btn').innerText = isLoginMode ? 'เข้าสู่ระบบ' : 'สมัครสมาชิกใหม่';
+        }
+
+        async function handleAuth() {
+            const studentNo = document.getElementById('student-no').value;
+            const password = document.getElementById('password').value;
+            // แปลงเลขที่เป็น Email ปลอมเพื่อให้ Supabase Auth ทำงานได้
+            const fakeEmail = `student${studentNo}@roomfund.com`;
+
+            if (isLoginMode) {
+                const { error } = await sb.auth.signInWithPassword({ email: fakeEmail, password: password });
+                if (error) alert('เลขที่หรือรหัสผ่านไม่ถูกต้องครับ'); else location.reload();
+            } else {
+                const fullName = document.getElementById('full-name').value;
+                const { data, error } = await sb.auth.signUp({ email: fakeEmail, password: password });
+                if (error) return alert('เลขที่นี้อาจมีคนใช้แล้วหรือข้อมูลไม่ครบ');
+                if (data.user) {
+                    await sb.from('profiles').insert([{ id: data.user.id, full_name: fullName, student_no: studentNo }]);
+                    alert('สมัครสำเร็จ! ล็อกอินเข้าใช้งานได้เลย');
+                    location.reload();
+                }
+            }
+        }
 
         async function checkSession() {
             const { data: { user } } = await sb.auth.getUser();
@@ -75,46 +106,9 @@
             }
         }
 
-        function toggleAuthMode(mode) {
-            isLoginMode = mode === 'login';
-            document.getElementById('signup-extra-fields').classList.toggle('hidden', isLoginMode);
-            
-            // เปลี่ยนสีปุ่มเมนูสลับ
-            document.getElementById('btn-login-mode').className = isLoginMode ? 'flex-1 py-2 rounded-lg font-semibold bg-white shadow-sm' : 'flex-1 py-2 rounded-lg font-semibold text-gray-500';
-            document.getElementById('btn-signup-mode').className = !isLoginMode ? 'flex-1 py-2 rounded-lg font-semibold bg-white shadow-sm' : 'flex-1 py-2 rounded-lg font-semibold text-gray-500';
-            
-            document.getElementById('auth-submit-btn').innerText = isLoginMode ? 'เข้าสู่ระบบ' : 'สมัครสมาชิกใหม่';
-        }
-
-        async function handleAuth() {
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            if (isLoginMode) {
-                const { error } = await sb.auth.signInWithPassword({ email, password });
-                if (error) alert('เมลหรือรหัสผ่านไม่ถูกต้องครับ'); else location.reload();
-            } else {
-                const fullName = document.getElementById('full-name').value;
-                const studentNo = document.getElementById('student-no').value;
-                const { data, error } = await sb.auth.signUp({ email, password });
-                
-                if (error) return alert(error.message);
-                
-                if (data.user) {
-                    // เก็บชื่อและเลขที่ลงตาราง profiles
-                    await sb.from('profiles').insert([{ id: data.user.id, full_name: fullName, student_no: studentNo }]);
-                    alert('สมัครสมาชิกเรียบร้อย! ลองล็อกอินดูนะ');
-                    location.reload();
-                }
-            }
-        }
-
         async function loadData(user) {
-            // ดึงชื่อผู้ใช้
             const { data: prof } = await sb.from('profiles').select('*').eq('id', user.id).single();
             if (prof) document.getElementById('user-display').innerText = `ผู้ใช้: ${prof.full_name} (เลขที่ ${prof.student_no})`;
-
-            // ดึงยอดเงินห้อง (เฉพาะที่แอดมินกด Approve แล้ว)
             const { data: tx } = await sb.from('transactions').select('amount').eq('status', 'approved');
             const total = tx ? tx.reduce((sum, t) => sum + Number(t.amount), 0) : 0;
             document.getElementById('room-total').innerText = total.toLocaleString() + ' บาท';
@@ -124,32 +118,15 @@
             const amount = document.getElementById('amount').value;
             const file = document.getElementById('slip-file').files[0];
             const { data: { user } } = await sb.auth.getUser();
-
-            if (!amount || !file) return alert('กรอกยอดเงินและเลือกรูปสลิปด้วยครับ');
-
+            if (!amount || !file) return alert('กรอกข้อมูลไม่ครบ');
             const fileName = `slip_${Date.now()}_${user.id}`;
-            
-            // 1. อัปโหลดรูปไปที่ Storage
-            const { error: storageErr } = await sb.storage.from('slips').upload(fileName, file);
-            if (storageErr) return alert('อัปโหลดรูปไม่สำเร็จครับ');
-
-            // 2. บันทึกข้อมูลลงฐานข้อมูล
-            const { error: dbErr } = await sb.from('transactions').insert([{ user_id: user.id, amount: amount, slip_url: fileName }]);
-            
-            if (!dbErr) {
-                alert('ส่งข้อมูลสำเร็จ! รอแอดมินตรวจสอบนะ');
-                location.reload();
-            } else {
-                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-            }
+            await sb.storage.from('slips').upload(fileName, file);
+            await sb.from('transactions').insert([{ user_id: user.id, amount: amount, slip_url: fileName }]);
+            alert('ส่งสลิปแล้ว! รอแอดมินตรวจนะครับ');
+            location.reload();
         }
 
-        async function signOut() { 
-            await sb.auth.signOut(); 
-            location.reload(); 
-        }
-
-        // เริ่มทำงานเมื่อโหลดหน้าเว็บ
+        async function signOut() { await sb.auth.signOut(); location.reload(); }
         window.onload = checkSession;
     </script>
 </body>
